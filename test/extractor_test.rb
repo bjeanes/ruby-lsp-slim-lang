@@ -90,6 +90,70 @@ module RubyLsp
         RUBY
       end
 
+      def test_interpolation_in_text
+        assert_extracts(<<~'SLIM', <<~RUBY)
+          p Hello #{user.name}!
+          | Hi #{a} and #{b}
+          p
+            | First line
+              then #{c}
+          <b>#{d}</b>
+          /! Rendered #{e}
+        SLIM
+         |          user.name;
+         |       a;       b;
+         |
+         |
+         |           c;
+         |     d;
+         |              e;
+        RUBY
+      end
+
+      def test_interpolation_in_quoted_attributes
+        assert_extracts(<<~'SLIM', <<~RUBY)
+          a href="/users/#{user.id}" title='#{user.name}' Profile
+        SLIM
+         |                 user.id;           user.name;
+        RUBY
+      end
+
+      def test_interpolation_in_embedded_engines
+        assert_extracts(<<~'SLIM', <<~RUBY)
+          javascript:
+            var user = #{user.to_json};
+        SLIM
+         |
+         |               user.to_json;
+        RUBY
+      end
+
+      def test_interpolation_with_nested_braces
+        assert_extracts(<<~'SLIM', <<~RUBY)
+          p #{items.map { |i| i.name }.join}
+        SLIM
+         |    items.map { |i| i.name }.join;
+        RUBY
+      end
+
+      def test_unescaped_interpolation
+        assert_extracts(<<~'SLIM', <<~RUBY)
+          p #{{raw_html}}
+        SLIM
+         |     raw_html;
+        RUBY
+      end
+
+      def test_text_that_is_not_interpolated
+        assert_extracts(<<~'SLIM', <<~RUBY)
+          p Escaped \#{not_ruby}
+          / A Slim comment #{not_rendered}
+        SLIM
+         |
+         |
+        RUBY
+      end
+
       def test_markup_is_blank
         assert_extracts(<<~SLIM, <<~RUBY)
           doctype html

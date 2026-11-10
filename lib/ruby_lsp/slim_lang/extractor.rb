@@ -20,6 +20,7 @@ module RubyLsp
 
       def extract(source)
         @spans = []
+        @interpolatable = []
         call(source)
         render(source)
       end
@@ -27,6 +28,9 @@ module RubyLsp
       protected
 
       def parse_line_indicators
+        # Since Slim interpolates inline HTML (`<b>#{x}</b>`) the same way as text, the rest of the line is recorded for
+        # `interpolations` to search.
+        @interpolatable << Span.new(@lineno, column, @lineno, @orig_line.size) if @line.start_with?("<")
         return super unless @line =~ @embedded_re && Regexp.last_match(1) == "ruby"
 
         header_line = @lineno
@@ -50,6 +54,22 @@ module RubyLsp
         code
       end
 
+      def parse_text_block(first_line = nil, text_indent = nil)
+        start_line = @lineno
+        start_column = first_line ? @orig_line.size - first_line.size : @orig_line.size
+        text = super
+        @interpolatable << Span.new(start_line, start_column, @lineno, @orig_line.size)
+        text
+      end
+
+      def parse_quoted_attribute(quote)
+        start_line = @lineno
+        start_column = column
+        value = super
+        @interpolatable << Span.new(start_line, start_column, @lineno, column)
+        value
+      end
+
       private
 
       def column
@@ -60,17 +80,14 @@ module RubyLsp
       def render(source)
         lines = source.split("\n", -1)
         ruby = lines.map { |line| Array.new(line.size, false) }
+        spans = @spans + interpolations(lines)
 
-        @spans.each do |span|
-          (span.start_line..span.end_line).each do |lineno|
-            from = lineno == span.start_line ? span.start_column : 0
-            to = lineno == span.end_line ? span.end_column : lines[lineno - 1].size
-            ruby[lineno - 1].fill(true, from...to)
-          end
+        spans.each do |span|
+          each_segment(span, lines) { |index, from, to| ruby[index].fill(true, from...to) }
         end
 
         # Without a separator, `a href=foo title=bar` would extract to `foo bar`, which Ruby reads as `foo(bar)`.
-        @spans.each do |span|
+        spans.each do |span|
           line = ruby[span.end_line - 1]
           line[span.end_column] ||= :separator if span.end_column < line.size
         end
@@ -84,6 +101,43 @@ module RubyLsp
             end
           end.join
         end.join("\n")
+      end
+
+      def interpolations(lines)
+        @interpolatable.flat_map do |span|
+          found = []
+          each_segment(span, lines) do |index, from, to|
+            line = lines[index]
+            line[from...to].scan(/(?<!\\)#\{/) do
+              code_start = from + Regexp.last_match.end(0)
+              code_end = closing_brace(line, code_start, to)
+              if line[code_start] == "{" && line[code_end - 1] == "}"
+                code_start += 1
+                code_end -= 1
+              end
+              found << Span.new(index + 1, code_start, index + 1, code_end)
+            end
+          end
+          found
+        end
+      end
+
+      def closing_brace(line, from, to)
+        depth = 1
+        (from...to).each do |col|
+          depth += 1 if line[col] == "{"
+          depth -= 1 if line[col] == "}"
+          return col if depth.zero?
+        end
+        to
+      end
+
+      def each_segment(span, lines)
+        (span.start_line..span.end_line).each do |lineno|
+          from = lineno == span.start_line ? span.start_column : 0
+          to = lineno == span.end_line ? span.end_column : lines[lineno - 1].size
+          yield lineno - 1, from, to
+        end
       end
     end
   end
