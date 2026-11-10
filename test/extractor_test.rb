@@ -415,6 +415,10 @@ module RubyLsp
         assert_equal(["    café", "  total \u{FFFD}"], extracted.lines.map(&:rstrip))
       end
 
+      def test_byte_order_mark
+        assert_equal("     foo", Extractor.extract("\uFEFFp = foo"))
+      end
+
       def test_markup_is_blank
         assert_extracts(<<~SLIM, <<~RUBY)
           doctype html

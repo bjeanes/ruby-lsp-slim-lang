@@ -29,6 +29,9 @@ module RubyLsp
         # Ruby LSP reads a template that isn't open in the editor as binary. Matching Slim's UTF-8 patterns against
         # non-ASCII bytes in it would raise, as would splitting it if it held invalid UTF-8.
         source = source.dup.force_encoding(Encoding::UTF_8).scrub
+        # `Slim::Engine` strips a byte order mark before parsing, which calling the parser directly skips. A space in
+        # its place keeps the first line's Ruby at the column it has in the template.
+        without_bom = source.sub(/\A\uFEFF/, " ")
         @encoding = encoding
         skipped = {}
         tree = begin
@@ -38,7 +41,7 @@ module RubyLsp
           @open_blocks = []
           @ends = Hash.new(0)
           @last_content_line = 0
-          call(without_lines(source, skipped))
+          call(without_lines(without_bom, skipped))
         rescue ::Slim::Parser::SyntaxError
           # Since Slim can raise far below where the problem is (an unclosed `a(href=x` raises at the end of the file),
           # we skip the line the failing statement started on, not the line Slim reports.
