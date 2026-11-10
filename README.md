@@ -38,8 +38,7 @@ require("lspconfig").ruby_lsp.setup({
 })
 ```
 
-Neovim 0.10 doesn't detect `.slim` files by itself, and other versions haven't been checked. If yours doesn't, and you
-don't have a Slim syntax plugin, add:
+Neovim doesn't detect `.slim` files by itself (as of 0.12). Unless a Slim syntax plugin does that for you, add:
 
 ```lua
 vim.filetype.add({ extension = { slim = "slim" } })
