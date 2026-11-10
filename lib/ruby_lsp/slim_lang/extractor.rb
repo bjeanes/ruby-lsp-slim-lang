@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "prism"
 require "slim"
 
 module RubyLsp
@@ -125,15 +126,35 @@ module RubyLsp
           line[span.end_column] ||= :separator if span.end_column < line.size
         end
 
-        lines.each_with_index.map do |line, index|
+        rendered = lines.each_with_index.map do |line, index|
           line.each_char.with_index.map do |char, col|
             case ruby[index][col]
             when true then char
             when :separator then ";"
             else " "
             end
-          end.join + ";end" * @ends[index + 1]
-        end.join("\n")
+          end.join
+        end
+
+        blank_comments_before_ends(rendered)
+        rendered.each_with_index.map { |line, index| line + ";end" * @ends[index + 1] }.join("\n")
+      end
+
+      # Without this, `- foo # note` followed by a dedent would extract to `foo # note;end`, where the `end` is commented
+      # out. Prism finds the comments, because a `#` inside a string (as in `"#{x} # y"`) isn't one.
+      def blank_comments_before_ends(rendered)
+        return if @ends.empty?
+
+        Prism.parse_comments(rendered.join("\n"), partial_script: true).each do |comment|
+          next unless comment.is_a?(Prism::InlineComment)
+
+          index = comment.location.start_line - 1
+          next unless @ends.key?(index + 1)
+
+          line = rendered[index]
+          start = line.byteslice(0, comment.location.start_column).size
+          rendered[index] = line[0...start] + " " * (line.size - start)
+        end
       end
 
       def interpolations(lines)

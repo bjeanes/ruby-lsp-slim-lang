@@ -217,6 +217,20 @@ module RubyLsp
         RUBY
       end
 
+      def test_comments_do_not_hide_implicit_ends
+        assert_extracts(<<~'SLIM', <<~'RUBY')
+          - if admin? # admins only
+            = link_to(name, path) # a link
+          - items.each do |item|
+            = "#{item.name} # not a comment"
+        SLIM
+         |  if admin? # admins only
+         |    link_to(name, path)         ;end
+         |  items.each do |item|
+         |    "#{item.name} # not a comment";end
+        RUBY
+      end
+
       def test_markup_is_blank
         assert_extracts(<<~SLIM, <<~RUBY)
           doctype html
