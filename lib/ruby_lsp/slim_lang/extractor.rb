@@ -28,7 +28,7 @@ module RubyLsp
         # non-ASCII bytes in it would raise, as would splitting it if it held invalid UTF-8.
         source = source.dup.force_encoding(Encoding::UTF_8).scrub
         @encoding = encoding
-        skipped = []
+        skipped = {}
         begin
           @spans = []
           @interpolatable = []
@@ -39,8 +39,14 @@ module RubyLsp
         rescue ::Slim::Parser::SyntaxError
           # Since Slim can raise far below where the problem is (an unclosed `a(href=x` raises at the end of the file),
           # we skip the line the failing statement started on, not the line Slim reports.
-          if skipped.size < MAX_SKIPPED_STATEMENTS && !skipped.include?(@statement_line)
-            skipped << @statement_line
+          #
+          # Rather than blanking a skipped line, we first replace it with a `div`, so that the lines nested under it
+          # still have a parent. If the `div` fails too (as it would if nested under an `img/`), we blank the line.
+          if !skipped.key?(@statement_line) && skipped.size < MAX_SKIPPED_STATEMENTS
+            skipped[@statement_line] = :placeholder
+            retry
+          elsif skipped[@statement_line] == :placeholder
+            skipped[@statement_line] = :blank
             retry
           end
         end
@@ -133,8 +139,14 @@ module RubyLsp
         end
       end
 
-      def without_lines(source, linenos)
-        source.split("\n", -1).each_with_index.map { |line, index| linenos.include?(index + 1) ? "" : line }.join("\n")
+      def without_lines(source, skipped)
+        source.split("\n", -1).each_with_index.map do |line, index|
+          case skipped[index + 1]
+          when :placeholder then "#{line[/\A\s*/]}div"
+          when :blank then ""
+          else line
+          end
+        end.join("\n")
       end
 
       def column

@@ -245,6 +245,34 @@ module RubyLsp
         RUBY
       end
 
+      def test_keeps_the_lines_nested_under_a_skipped_statement
+        assert_extracts(<<~SLIM, <<~RUBY)
+          doctype html
+          html(lang=
+            body
+              p = first
+              p = second
+        SLIM
+         |
+         |
+         |
+         |        first
+         |        second
+        RUBY
+      end
+
+      def test_blanks_a_skipped_statement_that_cannot_have_a_parent
+        assert_extracts(<<~SLIM, <<~RUBY)
+          img/
+            p = orphan
+          p = after
+        SLIM
+         |
+         |
+         |    after
+        RUBY
+      end
+
       def test_keeps_ruby_found_before_too_many_errors
         template = "p = before\n" + "%p\n" * (Extractor::MAX_SKIPPED_STATEMENTS + 1) + "p = after\n"
 
