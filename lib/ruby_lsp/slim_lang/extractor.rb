@@ -17,6 +17,7 @@ module RubyLsp
       CONTINUES_BLOCK = /\A-\s*#{::Slim::EndInserter::ELSE_RE.source.delete_prefix("\\A")}/
       SLIM_COMMENT = %r{\A/(?![!\[])} # `/!` and `/[` are HTML comments
       MAX_SKIPPED_STATEMENTS = 10
+      INTERPOLATED_ENGINES = ["javascript", "css", "markdown", "asciidoc", "textile", "rdoc"].freeze
 
       class << self
         def extract(source, encoding: Encoding::UTF_16LE)
@@ -122,7 +123,10 @@ module RubyLsp
         engines = {}.compare_by_identity
         each_embedded(tree) { |engine, body| engines[body] = engine }
         @text_blocks.each do |body, span|
-          (engines[body] == "ruby" ? @spans : @interpolatable) << span
+          case engines[body]
+          when "ruby" then @spans << span
+          when nil, *INTERPOLATED_ENGINES then @interpolatable << span
+          end
         end
       end
 

@@ -125,6 +125,24 @@ module RubyLsp
         RUBY
       end
 
+      def test_interpolation_only_in_engines_slim_interpolates
+        assert_extracts(<<~'SLIM', <<~RUBY)
+          javascript:
+            var name = "#{user.name}";
+          scss:
+            .a { width: #{$width}; }
+          coffee:
+            alert "Hi #{name}"
+        SLIM
+         |
+         |                user.name;
+         |
+         |
+         |
+         |
+        RUBY
+      end
+
       def test_interpolation_in_quoted_attributes
         assert_extracts(<<~'SLIM', <<~RUBY)
           a href="/users/#{user.id}" title='#{user.name}' Profile
