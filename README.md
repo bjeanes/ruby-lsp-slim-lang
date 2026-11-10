@@ -4,8 +4,8 @@ A [Ruby LSP](https://github.com/Shopify/ruby-lsp) add-on for the Ruby inside [Sl
 templates. It gives you go-to-definition, hover, completion and the other features Ruby LSP offers for ERB, in `.slim`
 files.
 
-Since it reads templates with Slim's own parser, it understands Slim's syntax the way Slim does. That includes attribute
-values, splats, `ruby:` blocks, `#{}` interpolation and lines continued with a trailing comma or backslash.
+Since it reads templates with Slim's own parser, it understands most of Slim's syntax the way Slim does. That includes
+attribute values, splats, `ruby:` blocks, `#{}` interpolation and lines continued with a trailing comma or backslash.
 
 ## Installation
 
@@ -63,6 +63,8 @@ Some things are specific to Slim:
 
 - If Slim can't parse part of a template, ruby-lsp-slim-lang skips the line the failing statement starts on and reads
   the rest. Until you fix the error, that line gets no features.
+- Slim adds a `do` to a line such as `- 3.times` when lines are nested under it. ruby-lsp-slim-lang doesn't yet. Since
+  that only changes the scope of local variables assigned in those lines, you're unlikely to notice.
 - Since Ruby LSP doesn't boot your application, ruby-lsp-slim-lang only knows Slim's default shortcuts and attribute
   delimiters. It won't recognise any you configure, for example in an initialiser.
 
