@@ -231,6 +231,27 @@ module RubyLsp
         RUBY
       end
 
+      def test_skips_statements_slim_cannot_parse
+        assert_extracts(<<~SLIM, <<~RUBY)
+          p = before
+          a(href=unclosed
+          %p Unknown line indicator
+          p = after
+        SLIM
+         |    before
+         |
+         |
+         |    after
+        RUBY
+      end
+
+      def test_keeps_ruby_found_before_too_many_errors
+        template = "p = before\n" + "%p\n" * (Extractor::MAX_SKIPPED_STATEMENTS + 1) + "p = after\n"
+
+        assert_equal("    before", Extractor.extract(template).lines.first.rstrip)
+        refute_includes(Extractor.extract(template), "after")
+      end
+
       def test_markup_is_blank
         assert_extracts(<<~SLIM, <<~RUBY)
           doctype html

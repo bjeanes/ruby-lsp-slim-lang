@@ -15,6 +15,7 @@ module RubyLsp
 
       OPENS_BLOCK = ::Slim::EndInserter::IF_RE
       CONTINUES_BLOCK = /\A-\s*#{::Slim::EndInserter::ELSE_RE.source.delete_prefix("\\A")}/
+      MAX_SKIPPED_STATEMENTS = 10
 
       class << self
         def extract(source)
@@ -23,12 +24,22 @@ module RubyLsp
       end
 
       def extract(source)
-        @spans = []
-        @interpolatable = []
-        @open_blocks = []
-        @ends = Hash.new(0)
-        @last_content_line = 0
-        call(source)
+        skipped = []
+        begin
+          @spans = []
+          @interpolatable = []
+          @open_blocks = []
+          @ends = Hash.new(0)
+          @last_content_line = 0
+          call(without_lines(source, skipped))
+        rescue ::Slim::Parser::SyntaxError
+          # Since Slim can raise far below where the problem is (an unclosed `a(href=x` raises at the end of the file),
+          # we skip the line the failing statement started on, not the line Slim reports.
+          if skipped.size < MAX_SKIPPED_STATEMENTS && !skipped.include?(@statement_line)
+            skipped << @statement_line
+            retry
+          end
+        end
         @open_blocks.each { @ends[@last_content_line] += 1 }
         render(source)
       end
@@ -41,6 +52,7 @@ module RubyLsp
       end
 
       def parse_line
+        @statement_line = @lineno
         if @line.match?(/\S/)
           @indent = get_indent(@line)
           close_blocks(continuing: @line.lstrip.match?(CONTINUES_BLOCK))
@@ -104,6 +116,10 @@ module RubyLsp
 
           @ends[@last_content_line] += 1
         end
+      end
+
+      def without_lines(source, linenos)
+        source.split("\n", -1).each_with_index.map { |line, index| linenos.include?(index + 1) ? "" : line }.join("\n")
       end
 
       def column
