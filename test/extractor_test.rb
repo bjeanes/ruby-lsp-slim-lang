@@ -252,6 +252,14 @@ module RubyLsp
         refute_includes(Extractor.extract(template), "after")
       end
 
+      def test_blanks_take_the_width_of_what_they_replace
+        template = 'p 😀 é #{user.name}'
+
+        assert_equal("         user.name;", Extractor.extract(template))
+        assert_equal("            user.name;", Extractor.extract(template, encoding: Encoding::UTF_8))
+        assert_equal("        user.name;", Extractor.extract(template, encoding: Encoding::UTF_32))
+      end
+
       def test_markup_is_blank
         assert_extracts(<<~SLIM, <<~RUBY)
           doctype html

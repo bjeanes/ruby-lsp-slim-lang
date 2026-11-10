@@ -18,12 +18,13 @@ module RubyLsp
       MAX_SKIPPED_STATEMENTS = 10
 
       class << self
-        def extract(source)
-          new.extract(source)
+        def extract(source, encoding: Encoding::UTF_16LE)
+          new.extract(source, encoding: encoding)
         end
       end
 
-      def extract(source)
+      def extract(source, encoding: Encoding::UTF_16LE)
+        @encoding = encoding
         skipped = []
         begin
           @spans = []
@@ -118,6 +119,17 @@ module RubyLsp
         end
       end
 
+      # Without this, an emoji before some Ruby would shift that Ruby's column.
+      def code_units(char)
+        return 1 unless char.valid_encoding?
+
+        case @encoding
+        when Encoding::UTF_8 then char.bytesize
+        when Encoding::UTF_16LE then char.ord > 0xFFFF ? 2 : 1
+        else 1
+        end
+      end
+
       def without_lines(source, linenos)
         source.split("\n", -1).each_with_index.map { |line, index| linenos.include?(index + 1) ? "" : line }.join("\n")
       end
@@ -146,8 +158,8 @@ module RubyLsp
           line.each_char.with_index.map do |char, col|
             case ruby[index][col]
             when true then char
-            when :separator then ";"
-            else " "
+            when :separator then ";".ljust(code_units(char))
+            else " " * code_units(char)
             end
           end.join
         end
