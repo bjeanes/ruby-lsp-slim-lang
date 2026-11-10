@@ -60,9 +60,17 @@ module RubyLsp
           a(href=root_path) Home
           div *attributes_for(user)
         SLIM
-         |       user_path(user)
-         |       root_path
+         |       user_path(user);
+         |       root_path;
          |     attributes_for(user)
+        RUBY
+      end
+
+      def test_fragments_on_one_line_are_separated
+        assert_extracts(<<~SLIM, <<~RUBY)
+          a href=user_path(user) title=user.name = user.nickname
+        SLIM
+         |       user_path(user);      user.name;  user.nickname
         RUBY
       end
 
@@ -116,7 +124,7 @@ module RubyLsp
         template_lines = template.lines
         actual.lines.each_with_index do |line, lineno|
           line.chomp.each_char.with_index do |char, col|
-            next if char == " " || col >= template_lines[lineno].chomp.size
+            next if [" ", ";"].include?(char) || col >= template_lines[lineno].chomp.size
 
             assert_equal(template_lines[lineno][col], char, "moved from #{lineno + 1}:#{col}")
           end

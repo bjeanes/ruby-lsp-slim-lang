@@ -69,8 +69,20 @@ module RubyLsp
           end
         end
 
+        # Without a separator, `a href=foo title=bar` would extract to `foo bar`, which Ruby reads as `foo(bar)`.
+        @spans.each do |span|
+          line = ruby[span.end_line - 1]
+          line[span.end_column] ||= :separator if span.end_column < line.size
+        end
+
         lines.each_with_index.map do |line, index|
-          line.each_char.with_index.map { |char, col| ruby[index][col] ? char : " " }.join
+          line.each_char.with_index.map do |char, col|
+            case ruby[index][col]
+            when true then char
+            when :separator then ";"
+            else " "
+            end
+          end.join
         end.join("\n")
       end
     end
