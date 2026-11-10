@@ -217,6 +217,26 @@ module RubyLsp
         RUBY
       end
 
+      def test_slim_comments_do_not_close_blocks
+        assert_extracts(<<~SLIM, <<~RUBY)
+          - if admin?
+            p = admin
+          / otherwise
+          - else
+            p = guest
+          /! closes
+          p = after
+        SLIM
+         |  if admin?
+         |      admin
+         |
+         |  else
+         |      guest;end
+         |
+         |    after
+        RUBY
+      end
+
       def test_comments_do_not_hide_implicit_ends
         assert_extracts(<<~'SLIM', <<~'RUBY')
           - if admin? # admins only

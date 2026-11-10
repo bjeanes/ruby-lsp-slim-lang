@@ -15,6 +15,7 @@ module RubyLsp
 
       OPENS_BLOCK = ::Slim::EndInserter::IF_RE
       CONTINUES_BLOCK = /\A-\s*#{::Slim::EndInserter::ELSE_RE.source.delete_prefix("\\A")}/
+      SLIM_COMMENT = %r{\A/(?![!\[])} # `/!` and `/[` are HTML comments
       MAX_SKIPPED_STATEMENTS = 10
 
       class << self
@@ -65,7 +66,7 @@ module RubyLsp
         @statement_line = @lineno
         if @line.match?(/\S/)
           @indent = get_indent(@line)
-          close_blocks(continuing: @line.lstrip.match?(CONTINUES_BLOCK))
+          close_blocks(continuing: @line.lstrip.match?(CONTINUES_BLOCK)) unless @line.lstrip.match?(SLIM_COMMENT)
         end
         super
       end
