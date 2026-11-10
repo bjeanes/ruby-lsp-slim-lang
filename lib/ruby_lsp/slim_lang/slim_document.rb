@@ -10,7 +10,7 @@ module RubyLsp
         return false unless @needs_parsing
 
         @needs_parsing = false
-        @ruby_source = Extractor.extract(@source, encoding: @encoding)
+        @ruby_source = extract_ruby
         @parse_result = Prism.parse_lex(@ruby_source, partial_script: true)
         @code_units_cache = @parse_result.code_units_cache(@encoding)
         true
@@ -33,6 +33,14 @@ module RubyLsp
       end
 
       private
+
+      # Ruby LSP parses a document in its main loop, outside the `rescue` that turns a failing request into an error
+      # response. An exception here would stop the server.
+      def extract_ruby
+        Extractor.extract(@source, encoding: @encoding)
+      rescue StandardError
+        "\n" * @source.count("\n")
+      end
 
       def ruby_source_scanner
         case @encoding

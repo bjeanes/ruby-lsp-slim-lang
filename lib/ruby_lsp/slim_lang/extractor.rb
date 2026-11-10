@@ -24,6 +24,9 @@ module RubyLsp
       end
 
       def extract(source, encoding: Encoding::UTF_16LE)
+        # Ruby LSP reads a template that isn't open in the editor as binary. Matching Slim's UTF-8 patterns against
+        # non-ASCII bytes in it would raise, as would splitting it if it held invalid UTF-8.
+        source = source.dup.force_encoding(Encoding::UTF_8).scrub
         @encoding = encoding
         skipped = []
         begin

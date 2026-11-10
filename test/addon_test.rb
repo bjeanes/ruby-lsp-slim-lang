@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "minitest/mock"
+require "tmpdir"
 require "ruby_lsp/internal"
 require "ruby_lsp/test_helper"
+require "ruby_lsp/slim_lang/slim_document"
 
 module RubyLsp
   module SlimLang
@@ -73,6 +76,30 @@ module RubyLsp
           server.process_message(request("textDocument/completion", uri, line: 0, character: 18))
 
           assert_includes(pop_result(server).response.map(&:label), "salute")
+        end
+      end
+
+      def test_definition_in_a_template_that_is_not_open
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, "show.slim")
+          File.write(path, "p café\n= Greeter\n")
+          uri = URI::Generic.from_path(path: path)
+
+          with_slim("") do |server|
+            server.instance_variable_get(:@store).get(uri).parse!
+
+            assert_equal([[HELPERS_URI.to_s, 0]], definitions(server, uri, line: 1, character: 3))
+          end
+        end
+      end
+
+      def test_parse_never_raises
+        Extractor.stub(:extract, ->(*) { raise "unexpected" }) do
+          document = SlimDocument.new(
+            source: "p = x\n", version: 1, uri: URI("file:///fake/a.slim"), global_state: GlobalState.new,
+          )
+
+          assert_equal("\n", document.parse_result.source.source)
         end
       end
 

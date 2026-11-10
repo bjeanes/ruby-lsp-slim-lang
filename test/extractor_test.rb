@@ -260,6 +260,12 @@ module RubyLsp
         assert_equal("        user.name;", Extractor.extract(template, encoding: Encoding::UTF_32))
       end
 
+      def test_binary_and_invalid_source
+        extracted = Extractor.extract("p = café\n= total \xFF".b)
+
+        assert_equal(["    café", "  total \u{FFFD}"], extracted.lines.map(&:rstrip))
+      end
+
       def test_markup_is_blank
         assert_extracts(<<~SLIM, <<~RUBY)
           doctype html
