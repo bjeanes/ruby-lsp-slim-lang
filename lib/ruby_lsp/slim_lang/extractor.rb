@@ -30,9 +30,10 @@ module RubyLsp
         source = source.dup.force_encoding(Encoding::UTF_8).scrub
         @encoding = encoding
         skipped = {}
-        begin
+        tree = begin
           @spans = []
           @interpolatable = []
+          @text_blocks = {}.compare_by_identity
           @open_blocks = []
           @ends = Hash.new(0)
           @last_content_line = 0
@@ -50,7 +51,9 @@ module RubyLsp
             skipped[@statement_line] = :blank
             retry
           end
+          @stacks.first
         end
+        classify_text_blocks(tree)
         @open_blocks.each { @ends[@last_content_line] += 1 }
         render(source)
       end
@@ -75,11 +78,7 @@ module RubyLsp
         # Since Slim interpolates inline HTML (`<b>#{x}</b>`) the same way as text, the rest of the line is recorded for
         # `interpolations` to search.
         @interpolatable << Span.new(@lineno, column, @lineno, @orig_line.size) if @line.start_with?("<")
-        return super unless @line =~ @embedded_re && Regexp.last_match(1) == "ruby"
-
-        header_line = @lineno
         super
-        @spans << Span.new(header_line + 1, 0, @lineno, @orig_line.size) if @lineno > header_line
       end
 
       def parse_broken_line
@@ -103,7 +102,7 @@ module RubyLsp
         start_line = @lineno
         start_column = first_line ? @orig_line.size - first_line.size : @orig_line.size
         text = super
-        @interpolatable << Span.new(start_line, start_column, @lineno, @orig_line.size)
+        @text_blocks[text] = Span.new(start_line, start_column, @lineno, @orig_line.size)
         text
       end
 
@@ -116,6 +115,23 @@ module RubyLsp
       end
 
       private
+
+      # Slim parses the body of a `ruby:` block as a text block, the same as plain text. We can only tell them apart by
+      # where each one ends up in the parse tree, once Slim has finished parsing.
+      def classify_text_blocks(tree)
+        engines = {}.compare_by_identity
+        each_embedded(tree) { |engine, body| engines[body] = engine }
+        @text_blocks.each do |body, span|
+          (engines[body] == "ruby" ? @spans : @interpolatable) << span
+        end
+      end
+
+      def each_embedded(exp, &block)
+        return unless exp.is_a?(Array)
+
+        yield exp[2], exp[3] if exp[0] == :slim && exp[1] == :embedded
+        exp.each { |child| each_embedded(child, &block) }
+      end
 
       # Slim closes a block when a line is indented no deeper than the code that opened it. A `- else` (or `elsif`,
       # `when`, etc.) at the same depth continues the block instead. Here we pop it without adding an `end`. Since

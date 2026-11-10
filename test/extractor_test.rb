@@ -91,6 +91,20 @@ module RubyLsp
         RUBY
       end
 
+      def test_code_on_a_ruby_block_line
+        assert_extracts(<<~SLIM, <<~RUBY)
+          ruby: total = 1
+          div: ruby:
+            count = 2
+          div: ruby: first = 3
+        SLIM
+         |      total = 1
+         |
+         |  count = 2
+         |           first = 3
+        RUBY
+      end
+
       def test_interpolation_in_text
         assert_extracts(<<~'SLIM', <<~RUBY)
           p Hello #{user.name}!
