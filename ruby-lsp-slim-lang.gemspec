@@ -10,9 +10,10 @@ Gem::Specification.new do |spec|
 
   spec.summary = "A Ruby LSP add-on for the Ruby code in Slim templates"
   spec.homepage = "https://github.com/bjeanes/ruby-lsp-slim-lang"
+  spec.license = "MIT"
   spec.required_ruby_version = ">= 3.0"
 
-  spec.files = Dir["lib/**/*.rb"]
+  spec.files = Dir["lib/**/*.rb"] + ["LICENSE.txt"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency("ruby-lsp", ">= 0.26", "< 0.28")

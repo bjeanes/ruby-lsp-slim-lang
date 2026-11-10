@@ -72,3 +72,7 @@ Some things are specific to Slim:
 bundle install
 bundle exec rake
 ```
+
+## Licence
+
+MIT. See [LICENSE.txt](LICENSE.txt).
