@@ -231,6 +231,75 @@ module RubyLsp
         RUBY
       end
 
+      def test_implicit_ends_after_a_heredoc
+        assert_extracts(<<~SLIM, <<~RUBY)
+          - if admin?
+            ruby:
+              note = <<~TEXT
+                Hello
+              TEXT
+          p = note
+          - if guest?
+            ruby:
+              note = <<~TEXT
+                Hello
+              TEXT
+          = note
+        SLIM
+         |  if admin?
+         |
+         |    note = <<~TEXT
+         |      Hello
+         |    TEXT
+         |end;note
+         |  if guest?
+         |
+         |    note = <<~TEXT
+         |      Hello
+         |    TEXT
+         |  note;end
+        RUBY
+      end
+
+      def test_implicit_ends_after_a_heredoc_with_no_ruby_below_it
+        assert_extracts(<<~SLIM, <<~RUBY)
+          - if admin?
+            ruby:
+              note = <<~TEXT
+                Hello
+              TEXT
+
+          p Text
+        SLIM
+         |  if admin?
+         |
+         |    note = <<~TEXT
+         |      Hello
+         |    TEXT
+         |;end
+         |
+        RUBY
+        assert_extracts(<<~SLIM, <<~RUBY)
+          - if admin?
+            ruby:
+              note = <<~TEXT
+                Hello
+              TEXT
+          p
+        SLIM
+         |  if admin?
+         |
+         |    note = <<~TEXT
+         |      Hello
+         |    TEXT
+         | ;end
+        RUBY
+
+        extracted = Extractor.extract("- if admin?\n  ruby:\n    note = <<~TEXT\n      Hello\n    TEXT")
+        assert_equal(["    TEXT", ";end"], extracted.lines.last(2).map(&:chomp))
+        assert_empty(Prism.parse(extracted, partial_script: true).errors)
+      end
+
       def test_skips_statements_slim_cannot_parse
         assert_extracts(<<~SLIM, <<~RUBY)
           p = before
@@ -328,8 +397,9 @@ module RubyLsp
       def assert_positions_preserved(template, actual)
         template_lines = template.lines
         actual.lines.each_with_index do |line, lineno|
+          moved_ends = line[/\A(?:end;)*/].size
           line.chomp.each_char.with_index do |char, col|
-            next if [" ", ";"].include?(char) || col >= template_lines[lineno].chomp.size
+            next if [" ", ";"].include?(char) || col < moved_ends || col >= template_lines[lineno].chomp.size
 
             assert_equal(template_lines[lineno][col], char, "moved from #{lineno + 1}:#{col}")
           end

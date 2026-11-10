@@ -179,8 +179,30 @@ module RubyLsp
           end.join
         end
 
+        move_ends_off_heredoc_terminators(rendered)
         blank_comments_before_ends(rendered)
         rendered.each_with_index.map { |line, index| line + ";end" * @ends[index + 1] }.join("\n")
+      end
+
+      # Since a heredoc's closing line can hold nothing but its terminator, the `end`s for that line go on the next one.
+      # When that line's indent is too narrow for them, they go after its Ruby, which puts that Ruby inside the block.
+      # We accept the wrong semantics on that one line to keep the syntax valid. Giving the `end`s a line of their own
+      # would put every line below it out of step with the template. On the terminator, they would leave the heredoc
+      # open to the end of the file.
+      def move_ends_off_heredoc_terminators(rendered)
+        tokens = Prism.lex(rendered.join("\n"), partial_script: true).value
+        tokens.each do |token, _state|
+          next unless token.type == :HEREDOC_END && (count = @ends.delete(token.location.start_line))
+
+          index = token.location.start_line
+          following = rendered[index] ||= +""
+          ends = "end;" * count
+          if following.start_with?(" " * ends.size)
+            rendered[index] = ends + following[ends.size..]
+          else
+            @ends[index + 1] += count
+          end
+        end
       end
 
       # Without this, `- foo # note` followed by a dedent would extract to `foo # note;end`, where the `end` is commented
