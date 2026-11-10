@@ -12,6 +12,9 @@ module RubyLsp
     class Extractor < ::Slim::Parser
       Span = Struct.new(:start_line, :start_column, :end_line, :end_column)
 
+      OPENS_BLOCK = ::Slim::EndInserter::IF_RE
+      CONTINUES_BLOCK = /\A-\s*#{::Slim::EndInserter::ELSE_RE.source.delete_prefix("\\A")}/
+
       class << self
         def extract(source)
           new.extract(source)
@@ -21,11 +24,28 @@ module RubyLsp
       def extract(source)
         @spans = []
         @interpolatable = []
+        @open_blocks = []
+        @ends = Hash.new(0)
+        @last_content_line = 0
         call(source)
+        @open_blocks.each { @ends[@last_content_line] += 1 }
         render(source)
       end
 
       protected
+
+      def next_line
+        @last_content_line = @lineno if @orig_line&.match?(/\S/)
+        super
+      end
+
+      def parse_line
+        if @line.match?(/\S/)
+          @indent = get_indent(@line)
+          close_blocks(continuing: @line.lstrip.match?(CONTINUES_BLOCK))
+        end
+        super
+      end
 
       def parse_line_indicators
         # Since Slim interpolates inline HTML (`<b>#{x}</b>`) the same way as text, the rest of the line is recorded for
@@ -43,6 +63,7 @@ module RubyLsp
         start_column = column + @line[/\A\s*/].size
         code = super
         @spans << Span.new(start_line, start_column, @lineno, @orig_line.rstrip.size)
+        @open_blocks << @indent if code.match?(OPENS_BLOCK)
         code
       end
 
@@ -72,6 +93,18 @@ module RubyLsp
 
       private
 
+      # Slim closes a block when a line is indented no deeper than the code that opened it. A `- else` (or `elsif`,
+      # `when`, etc.) at the same depth continues the block instead. Here we pop it without adding an `end`. Since
+      # `OPENS_BLOCK` also matches `else`, the `- else` line pushes the block again when its code is parsed.
+      def close_blocks(continuing:)
+        while (indent = @open_blocks.last) && indent >= @indent
+          @open_blocks.pop
+          break if continuing && indent == @indent
+
+          @ends[@last_content_line] += 1
+        end
+      end
+
       def column
         @orig_line.size - @line.size
       end
@@ -99,7 +132,7 @@ module RubyLsp
             when :separator then ";"
             else " "
             end
-          end.join
+          end.join + ";end" * @ends[index + 1]
         end.join("\n")
       end
 

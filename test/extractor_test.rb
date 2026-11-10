@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "prism"
 require "ruby_lsp/slim_lang/extractor"
 
 module RubyLsp
@@ -154,6 +155,68 @@ module RubyLsp
         RUBY
       end
 
+      def test_implicit_ends
+        assert_extracts(<<~SLIM, <<~RUBY)
+          - if admin?
+            p Admin
+          - elsif user
+            p User
+          - else
+            p Guest
+          ul
+            - items.each do |item|
+              li = item.name
+          = form_with(model: user) do |form|
+            = form.text_field(:name)
+        SLIM
+         |  if admin?
+         |
+         |  elsif user
+         |
+         |  else
+         |         ;end
+         |
+         |    items.each do |item|
+         |         item.name;end
+         |  form_with(model: user) do |form|
+         |    form.text_field(:name);end
+        RUBY
+      end
+
+      def test_implicit_ends_for_nested_blocks
+        assert_extracts(<<~SLIM, <<~RUBY)
+          - users.each do |user|
+            - if user.admin?
+              p Admin
+
+          p After
+        SLIM
+         |  users.each do |user|
+         |    if user.admin?
+         |           ;end;end
+         |
+         |
+        RUBY
+      end
+
+      def test_implicit_ends_for_case
+        assert_extracts(<<~SLIM, <<~RUBY)
+          - case role
+          - when :admin
+            p Admin
+          - when :user
+            p User
+          p After
+        SLIM
+         |  case role
+         |  when :admin
+         |
+         |  when :user
+         |        ;end
+         |
+        RUBY
+      end
+
       def test_markup_is_blank
         assert_extracts(<<~SLIM, <<~RUBY)
           doctype html
@@ -182,6 +245,7 @@ module RubyLsp
           actual.lines.map(&:rstrip),
         )
         assert_positions_preserved(template, actual)
+        assert_empty(Prism.parse(actual, partial_script: true).errors.map(&:message))
       end
 
       def assert_positions_preserved(template, actual)
