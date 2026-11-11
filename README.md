@@ -13,7 +13,7 @@ Since Ruby LSP only loads add-ons from your application's bundle, add the gem to
 
 ```ruby
 group :development do
-  gem "ruby-lsp-slim-lang", require: false
+  gem "ruby-lsp-slim-lang", github: "bjeanes/ruby-lsp-slim-lang", require: false
 end
 ```
 
