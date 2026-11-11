@@ -46,8 +46,28 @@ vim.filetype.add({ extension = { slim = "slim" } })
 
 ### VS Code
 
-The Ruby LSP extension only sends Ruby and ERB files to the server. It has no setting to send other languages, so VS
-Code isn't supported for now.
+The Ruby LSP extension only sends Ruby and ERB files to the server. I've opened
+[Shopify/ruby-lsp#4270][vscode-pr] to add a `rubyLsp.addonLanguageIds` setting that sends other languages too. Until a
+release of the extension includes it, you can build the extension from [my fork][vscode-fork]:
+
+```sh
+git clone --branch addon-language-ids https://github.com/bjeanes/ruby-lsp.git
+cd ruby-lsp/vscode
+pnpm install
+pnpm run package
+code --install-extension vscode-ruby-lsp.vsix
+```
+
+Since VS Code would otherwise replace it with the Marketplace version, turn off auto-update for the Ruby LSP extension.
+You'll also need an extension that gives `.slim` files the `slim` language ID, such as a Slim syntax extension. Then add
+this to your settings and reload the window:
+
+```json
+"rubyLsp.addonLanguageIds": ["slim"]
+```
+
+[vscode-pr]: https://github.com/Shopify/ruby-lsp/pull/4270
+[vscode-fork]: https://github.com/bjeanes/ruby-lsp/tree/addon-language-ids
 
 ## What to expect
 
